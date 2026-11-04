@@ -1,6 +1,8 @@
 package com.example.afinal;
 
+import android.content.Intent;
 import android.os.Bundle;
+import android.view.View;
 
 import androidx.activity.EdgeToEdge;
 import androidx.appcompat.app.AppCompatActivity;
@@ -20,5 +22,15 @@ public class Start extends AppCompatActivity {
             v.setPadding(systemBars.left, systemBars.top, systemBars.right, systemBars.bottom);
             return insets;
         });
+    }
+
+    public void onBackPressed(View view) {
+        Intent i = new Intent(getBaseContext(), Title.class);
+        startActivity(i);
+    }
+
+    public void onStartGamePressed(View view) {
+        Intent i = new Intent(getBaseContext(), Game.class);
+        startActivity(i);
     }
 }

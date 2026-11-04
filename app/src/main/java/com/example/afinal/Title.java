@@ -1,6 +1,8 @@
 package com.example.afinal;
 
+import android.content.Intent;
 import android.os.Bundle;
+import android.view.View;
 
 import androidx.activity.EdgeToEdge;
 import androidx.appcompat.app.AppCompatActivity;
@@ -20,5 +22,15 @@ public class Title extends AppCompatActivity {
             v.setPadding(systemBars.left, systemBars.top, systemBars.right, systemBars.bottom);
             return insets;
         });
+    }
+
+    public void onStartPressed(View view) {
+        Intent i = new Intent(getBaseContext(), Start.class);
+        startActivity(i);
+    }
+
+    public void onSettingsPressed(View view) {
+        Intent i = new Intent(getBaseContext(), Settings.class);
+        startActivity(i);
     }
 }
