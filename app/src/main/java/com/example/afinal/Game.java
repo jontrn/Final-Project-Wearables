@@ -17,7 +17,8 @@ import com.google.firebase.firestore.FirebaseFirestore;
 public class Game extends AppCompatActivity {
 
     private FirebaseFirestore db;
-    private TextView questionView;
+    private TextView optionAView;
+    private TextView optionBView;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -32,14 +33,16 @@ public class Game extends AppCompatActivity {
 
         // access Firebase database
         db = FirebaseFirestore.getInstance();
-        questionView = findViewById(R.id.Question);
 
-        findViewById(R.id.Refresh).setOnClickListener(v -> loadRandomQuestion());
+        optionAView = findViewById(R.id.OptionA);
+        optionBView = findViewById(R.id.OptionB);
+
         loadRandomQuestion();
     }
 
     private void loadRandomQuestion() {
-        questionView.setText("Loading...");
+        optionAView.setText("Loading...");
+        optionBView.setText("Loading...");
         double rand = Math.random();
 
         // use rand value for each question in the database to pick a random question
@@ -60,7 +63,8 @@ public class Game extends AppCompatActivity {
                                 showQuestion(first.getDocuments().get(0));
                             }
                             else {
-                                questionView.setText("No questions found in database.");
+                                optionAView.setText("No questions found in database.");
+                                optionBView.setText("No questions found in database.");
                             }
                         })
                         .addOnFailureListener(this::showError);
@@ -80,15 +84,23 @@ public class Game extends AppCompatActivity {
         Long votesB = doc.getLong("votesB");
         votesB = votesB == null ? 0 : votesB;
 
-        questionView.setText(
-            optionA + " (" + votesA + " votes)"
-            + "\n\nor\n\n"
-            + optionB + " (" + votesB + " votes)"
-        );
+        optionAView.setText(optionA + " (" + votesA + " votes)");
+        optionBView.setText(optionB + " (" + votesB + " votes)");
     }
 
     private void showError(Exception e) {
-        questionView.setText("Error loading question: " + e.getMessage());
+        optionAView.setText("Error loading question: " + e.getMessage());
+        optionBView.setText("Error loading question: " + e.getMessage());
+    }
+
+    public void onLeftPressed(View view) {
+        // left answer (Option A) selected
+        loadRandomQuestion();
+    }
+
+    public void onRightPressed(View view) {
+        // right answer (Option B) selected
+        loadRandomQuestion();
     }
 
     public void onBackPressed(View view) {
