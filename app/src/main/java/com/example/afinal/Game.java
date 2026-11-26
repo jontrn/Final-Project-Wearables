@@ -30,12 +30,13 @@ public class Game extends AppCompatActivity implements SensorEventListener {
 
     private View fillLeft, fillRight;
     private TextView tvQuestion, tvOptionLeft, tvOptionRight;
-    private TextView tvStatsLeft, tvStatsRight, tvCurrentPlayer;
+    private TextView tvStatsLeft, tvStatsRight, tvCurrentPlayer, tvScore;
     private Button btnNextQuestion;
 
     private ArrayList<String> players;
     private boolean isTeamMode;
     private int currentPlayerIndex = 0;
+    private int[] scores;
 
     private float currentLeftFill = 0f;
     private float currentRightFill = 0f;
@@ -66,6 +67,7 @@ public class Game extends AppCompatActivity implements SensorEventListener {
         tvStatsLeft = findViewById(R.id.tvStatsLeft);
         tvStatsRight = findViewById(R.id.tvStatsRight);
         tvCurrentPlayer = findViewById(R.id.tvCurrentPlayer);
+        tvScore = findViewById(R.id.tvScore);
         btnNextQuestion = findViewById(R.id.btnNextQuestion);
 
         if (getIntent() != null) {
@@ -74,6 +76,12 @@ public class Game extends AppCompatActivity implements SensorEventListener {
         }
         if (players == null) players = new ArrayList<>();
         if (players.isEmpty()) players.add("Player 1");
+
+        if (isTeamMode) {
+            scores = new int[2];
+        } else {
+            scores = new int[players.size()];
+        }
 
         // Setup pivot for fill views to scale from the bottom
         View mainView = findViewById(R.id.main);
@@ -115,7 +123,18 @@ public class Game extends AppCompatActivity implements SensorEventListener {
             tvCurrentPlayer.setText("Player: " + playerName);
         }
 
+        updateScoreDisplay();
+
         loadRandomQuestion();
+    }
+
+    private void updateScoreDisplay() {
+        if (isTeamMode) {
+            int teamNum = (currentPlayerIndex % 2) + 1;
+            tvScore.setText("Team " + teamNum + " Score: " + scores[currentPlayerIndex % 2]);
+        } else {
+            tvScore.setText("Score: " + scores[currentPlayerIndex % players.size()]);
+        }
     }
 
     private void loadRandomQuestion() {
@@ -189,6 +208,23 @@ public class Game extends AppCompatActivity implements SensorEventListener {
         } else {
             fillRight.setScaleY(1f);
             fillLeft.setScaleY(0f);
+        }
+
+        // Check if point awarded (guessed the majority)
+        boolean isCorrect = false;
+        if (choseLeft && currentVotesLeft >= currentVotesRight) {
+            isCorrect = true;
+        } else if (!choseLeft && currentVotesRight >= currentVotesLeft) {
+            isCorrect = true;
+        }
+
+        if (isCorrect) {
+            if (isTeamMode) {
+                scores[currentPlayerIndex % 2]++;
+            } else {
+                scores[currentPlayerIndex % players.size()]++;
+            }
+            updateScoreDisplay();
         }
 
         // Show Stats based on Firebase data
