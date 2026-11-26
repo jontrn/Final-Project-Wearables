@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "898258468245",
+    "project_id": "would-you-rather-bcbd2",
+    "storage_bucket": "would-you-rather-bcbd2.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:898258468245:android:19a558367a63826d48ca9c",
+        "android_client_info": {
+          "package_name": "com.example.afinal"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBzDQrguF8qPgPLP1y2rmy99w0oAdtn_Cw"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

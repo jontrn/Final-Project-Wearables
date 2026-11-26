@@ -18,6 +18,9 @@ import androidx.core.graphics.Insets;
 import androidx.core.view.ViewCompat;
 import androidx.core.view.WindowInsetsCompat;
 
+import com.google.firebase.firestore.DocumentSnapshot;
+import com.google.firebase.firestore.FirebaseFirestore;
+
 import java.util.ArrayList;
 
 public class Game extends AppCompatActivity implements SensorEventListener {
@@ -38,25 +41,9 @@ public class Game extends AppCompatActivity implements SensorEventListener {
     private float currentRightFill = 0f;
     private boolean isChoiceLocked = false;
 
-    // Question data structure
-    private static class QuestionData {
-        String question;
-        String optLeft;
-        String optRight;
-        int statLeft;
-        int statRight;
-
-        QuestionData(String q, String l, String r, int sl, int sr) {
-            question = q;
-            optLeft = l;
-            optRight = r;
-            statLeft = sl;
-            statRight = sr;
-        }
-    }
-
-    private ArrayList<QuestionData> questions = new ArrayList<>();
-    private int currentQuestionIndex = 0;
+    private FirebaseFirestore db;
+    private long currentVotesLeft = 0;
+    private long currentVotesRight = 0;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -68,6 +55,8 @@ public class Game extends AppCompatActivity implements SensorEventListener {
             v.setPadding(systemBars.left, systemBars.top, systemBars.right, systemBars.bottom);
             return insets;
         });
+
+        db = FirebaseFirestore.getInstance();
 
         fillLeft = findViewById(R.id.fillLeft);
         fillRight = findViewById(R.id.fillRight);
@@ -83,8 +72,8 @@ public class Game extends AppCompatActivity implements SensorEventListener {
             players = getIntent().getStringArrayListExtra("PLAYERS");
             isTeamMode = getIntent().getBooleanExtra("IS_TEAM_MODE", false);
         }
-
-        setupDummyData();
+        if (players == null) players = new ArrayList<>();
+        if (players.isEmpty()) players.add("Player 1");
 
         // Setup pivot for fill views to scale from the bottom
         View mainView = findViewById(R.id.main);
@@ -106,13 +95,6 @@ public class Game extends AppCompatActivity implements SensorEventListener {
         loadCurrentTurn();
     }
 
-    // Can get rid of this once Firebase questions set up
-    private void setupDummyData() {
-        questions.add(new QuestionData("Be able to fly or be invisible?", "Fly", "Invisible", 65, 35));
-        questions.add(new QuestionData("Travel 100 years to the past or future?", "Past", "Future", 20, 80));
-        questions.add(new QuestionData("Never eat pizza again or never eat burgers again?", "No Pizza", "No Burgers", 45, 55));
-    }
-
     private void loadCurrentTurn() {
         isChoiceLocked = false;
         currentLeftFill = 0f;
@@ -127,25 +109,72 @@ public class Game extends AppCompatActivity implements SensorEventListener {
         // Update Player text
         String playerName = players.get(currentPlayerIndex % players.size());
         if (isTeamMode) {
-            // For teams, assigning players alternating Team 1 vs Team 2
             int teamNum = (currentPlayerIndex % 2) + 1;
             tvCurrentPlayer.setText("Team " + teamNum + ": " + playerName);
         } else {
             tvCurrentPlayer.setText("Player: " + playerName);
         }
 
-        // Load question data
-        QuestionData qData = questions.get(currentQuestionIndex % questions.size());
-        tvQuestion.setText(qData.question);
-        tvOptionLeft.setText(qData.optLeft);
-        tvOptionRight.setText(qData.optRight);
+        loadRandomQuestion();
+    }
 
+    private void loadRandomQuestion() {
+        tvOptionLeft.setText("Loading...");
+        tvOptionRight.setText("Loading...");
+        pauseSensor(); // pause while loading
+
+        double rand = Math.random();
+
+        db.collection("questions")
+            .orderBy("rand")
+            .startAt(rand)
+            .limit(1)
+            .get()
+            .addOnSuccessListener(snap -> {
+                if (!snap.isEmpty()) {
+                    showQuestion(snap.getDocuments().get(0));
+                }
+                else {
+                    // random point landed past the last item in database, so wrap around
+                    db.collection("questions").orderBy("rand").limit(1).get()
+                        .addOnSuccessListener(first -> {
+                            if (!first.isEmpty()) {
+                                showQuestion(first.getDocuments().get(0));
+                            }
+                            else {
+                                tvOptionLeft.setText("No questions found.");
+                                tvOptionRight.setText("No questions found.");
+                            }
+                        })
+                        .addOnFailureListener(this::showError);
+                }
+            })
+            .addOnFailureListener(this::showError);
+    }
+
+    private void showQuestion(DocumentSnapshot doc) {
+        String optionA = doc.getString("optionA");
+        String optionB = doc.getString("optionB");
+
+        Long votesA = doc.getLong("votesA");
+        currentVotesLeft = votesA == null ? 0 : votesA;
+        Long votesB = doc.getLong("votesB");
+        currentVotesRight = votesB == null ? 0 : votesB;
+
+        tvOptionLeft.setText(optionA);
+        tvOptionRight.setText(optionB);
+        
+        // Ready for sensor input
         resumeSensor();
+    }
+
+    private void showError(Exception e) {
+        tvOptionLeft.setText("Error loading.");
+        tvOptionRight.setText("Error loading.");
     }
 
     private void loadNextTurn() {
         currentPlayerIndex++;
-        currentQuestionIndex++;
         loadCurrentTurn();
     }
 
@@ -162,10 +191,21 @@ public class Game extends AppCompatActivity implements SensorEventListener {
             fillLeft.setScaleY(0f);
         }
 
-        // Show Stats
-        QuestionData qData = questions.get(currentQuestionIndex % questions.size());
-        tvStatsLeft.setText(qData.statLeft + "%");
-        tvStatsRight.setText(qData.statRight + "%");
+        // Show Stats based on Firebase data
+        long total = currentVotesLeft + currentVotesRight;
+        int statLeft = 0;
+        int statRight = 0;
+        if (total > 0) {
+            statLeft = (int) ((currentVotesLeft * 100) / total);
+            statRight = (int) ((currentVotesRight * 100) / total);
+        } else {
+            // Default 50/50 if nobody has voted yet
+            statLeft = 50;
+            statRight = 50;
+        }
+
+        tvStatsLeft.setText(statLeft + "%");
+        tvStatsRight.setText(statRight + "%");
         tvStatsLeft.setVisibility(View.VISIBLE);
         tvStatsRight.setVisibility(View.VISIBLE);
 
@@ -176,9 +216,6 @@ public class Game extends AppCompatActivity implements SensorEventListener {
     public void onSensorChanged(SensorEvent event) {
         if (isChoiceLocked) return;
 
-        // X-axis gravity:
-        // Tilted left, x is positive.
-        // Tilted right, x is negative.
         float x = event.values[0];
 
         float maxTilt = 8.0f;
@@ -186,28 +223,22 @@ public class Game extends AppCompatActivity implements SensorEventListener {
         float fillRate = 0.04f;
 
         if (x > 2.0f) {
-            // Tilting left
             currentLeftFill += fillRate * (x / maxTilt);
             currentRightFill -= decayRate * 2;
         } else if (x < -2.0f) {
-            // Tilting right
             currentRightFill += fillRate * (-x / maxTilt);
             currentLeftFill -= decayRate * 2;
         } else {
-            // Neutral, decay both
             currentLeftFill -= decayRate;
             currentRightFill -= decayRate;
         }
 
-        // Clamp values
         currentLeftFill = Math.max(0f, Math.min(1f, currentLeftFill));
         currentRightFill = Math.max(0f, Math.min(1f, currentRightFill));
 
-        // Apply to UI
         fillLeft.setScaleY(currentLeftFill);
         fillRight.setScaleY(currentRightFill);
 
-        // Check for lock
         if (currentLeftFill >= 1f) {
             lockChoice(true);
         } else if (currentRightFill >= 1f) {
@@ -219,7 +250,7 @@ public class Game extends AppCompatActivity implements SensorEventListener {
     public void onAccuracyChanged(Sensor sensor, int accuracy) { }
 
     private void resumeSensor() {
-        if (sensorManager != null && gravitySensor != null) {
+        if (sensorManager != null && gravitySensor != null && !isChoiceLocked) {
             sensorManager.registerListener(this, gravitySensor, SensorManager.SENSOR_DELAY_GAME);
         }
     }
